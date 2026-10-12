@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+title: "Modified CLASS codes for varying fundamental constants"
+message: >-
+  If you use these codes, please cite the CLASS II paper (arXiv:1104.2933),
+  Lamine et al. (2025), A&A 697, A109, and the paper listed for the model you
+  used.
+type: software
+authors:
+  - family-names: Lamine
+    given-names: Brahim
+    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
+    orcid: "https://orcid.org/0000-0002-9416-2320"
+  - family-names: Beauchamp
+    given-names: Sébastien
+    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
+  - family-names: Blanchard
+    given-names: Alain
+    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
+  - family-names: Delhomelle
+    given-names: Jehanne
+    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
+  - family-names: Kou
+    given-names: Raphaël
+  - family-names: Rich
+    given-names: James
+repository-code: "https://github.com/blamine/varying-constants-class"
+references:
+  - type: article
+    authors:
+      - family-names: Lamine
+        given-names: Brahim
+      - family-names: Ozdalkiran
+        given-names: Yusuf
+      - family-names: Mirouze
+        given-names: Léo
+    title: "Cosmological constraints on a varying gravitational constant from the CMB"
+    journal: "Astronomy & Astrophysics"
+    volume: 697
+    year: 2025
+    start: A109

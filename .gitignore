@@ -1,0 +1,35 @@
+# arbres reconstruits par build.sh, jamais versionnes
+*/class_build/
+class_pristine/
+_patchtest/
+_classcheck/
+
+# artefacts de compilation
+*.o
+*.a
+*.so
+*.mod
+class
+build/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# sorties de runs, elles vont sur Zenodo
+output/
+*_cl.dat
+*_cl_lensed.dat
+*_pk.dat
+*_background.dat
+*_thermodynamics.dat
+*_unused_parameters
+*_parameters.ini
+runs.log
+nohup.out
+
+# environnements
+.venv/
+.python-version
+
+.DS_Store
+*~
