@@ -6,23 +6,18 @@ message: >-
   used.
 type: software
 authors:
+  - family-names: Kou
+    given-names: Raphael
+    affiliation: "Univ Toulouse, CNES, CNRS, IRAP, Toulouse, France"
+  - family-names: Ilic
+    given-names: Stéphane
+    affiliation: >-
+      Institut du Développement et des Ressources en Informatique Scientifique
+      (IDRIS), CNRS, Université Paris-Saclay, Orsay, France
   - family-names: Lamine
     given-names: Brahim
-    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
+    affiliation: "Univ Toulouse, CNES, CNRS, IRAP, Toulouse, France"
     orcid: "https://orcid.org/0000-0002-9416-2320"
-  - family-names: Beauchamp
-    given-names: Sébastien
-    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
-  - family-names: Blanchard
-    given-names: Alain
-    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
-  - family-names: Delhomelle
-    given-names: Jehanne
-    affiliation: "IRAP, Université de Toulouse, CNRS, CNES, UPS, France"
-  - family-names: Kou
-    given-names: Raphaël
-  - family-names: Rich
-    given-names: James
 repository-code: "https://github.com/blamine/varying-constants-class"
 references:
   - type: article
@@ -30,11 +25,21 @@ references:
       - family-names: Lamine
         given-names: Brahim
       - family-names: Ozdalkiran
-        given-names: Yusuf
+        given-names: Yacob
       - family-names: Mirouze
-        given-names: Léo
-    title: "Cosmological constraints on a varying gravitational constant from the CMB"
+        given-names: Louis
+      - family-names: Erdogan
+        given-names: Furkan
+      - family-names: Ilic
+        given-names: Stéphane
+      - family-names: Tutusaus
+        given-names: Isaac
+      - family-names: Kou
+        given-names: Raphael
+      - family-names: Blanchard
+        given-names: Alain
+    title: "Cosmological measurement of the gravitational constant G using the CMB, the BAO and the BBN"
     journal: "Astronomy & Astrophysics"
     volume: 697
     year: 2025
-    start: A109
+    doi: "10.1051/0004-6361/202451602"
