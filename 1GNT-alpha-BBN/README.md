@@ -73,5 +73,5 @@ If you use `1GNT-alpha-BBN`, please cite
 - Lamine, B., Ozdalkiran, Y., Mirouze, L., et al. 2025, A&A, 697, A109,
   for the treatment of a varying gravitational constant in CLASS,
 - Lamine, B., Beauchamp, S., Blanchard, A., et al., for this model,
-  reference to be completed on publication,
+  submitted to A&A,
 - and the Zenodo DOI of the release you used.

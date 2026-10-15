@@ -9,7 +9,7 @@ against a pinned upstream release, our own input files and tables, and a
 
 | Model | Upstream CLASS | What is modified | Paper | DOI |
 |---|---|---|---|---|
-| [`1GNT-alpha-BBN`](1GNT-alpha-BBN/) | v3.2.0 | Newton constant rescaled by `lambda_G**2`, with `YHe = BBN` reading a `(omega_b, lambda_G)` table from a modified PArthENoPE | Lamine et al. (in prep.) | 10.5281/zenodo.xxxxxxx |
+| [`1GNT-alpha-BBN`](1GNT-alpha-BBN/) | v3.2.0 | Newton constant rescaled by `lambda_G**2`, with `YHe = BBN` reading a `(omega_b, lambda_G)` table from a modified PArthENoPE | Lamine et al., submitted to A&A | 10.5281/zenodo.xxxxxxx |
 | `2Gfix` | | | | |
 
 ## Quick start
