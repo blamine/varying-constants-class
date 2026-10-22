@@ -16,7 +16,7 @@ cd class_build && mkdir -p output
 md5sum output/lambda_G_1.00_cl_lensed.dat   # 64ebf42b78f6054639947f0d10e2c70e
 ```
 
-To run all eight reference models and check every spectrum,
+To run all ten reference models and check every spectrum,
 
 ```bash
 for f in ../ini/lambda_G_*.ini; do ./class "$f"; done
@@ -53,17 +53,20 @@ the reionization redshift fixed across models.
 | `build.sh` | clone, patch, copy the BBN table, compile |
 | `bbn/sBBN_lambda_G.dat` | the `(omega_b_phys, lambda_G) -> YHe` table |
 | `bbn/README.md` | its format, and the warning about column 2 |
-| `ini/lambda_G_*.ini` | the eight reference runs, as CLASS emitted them |
-| `ini/CHECKSUMS.md5` | md5 of the eight lensed spectra |
+| `ini/lambda_G_*.ini` | the ten reference runs, as CLASS emitted them |
+| `ini/CHECKSUMS.md5` | md5 of the ten lensed spectra |
 | `ini/README.md` | the parameter convention and the Y_He provenance |
 
 ## Reproducibility
 
 The patch is verified in a stronger sense than merely applying cleanly. Applied
-to a bare clone of upstream v3.2.0, it reconstructs our working tree character
-for character over `include/`, `main/`, `source/` and `python/cclassy.pxd`.
-The `md5` checks above then confirm that the reconstructed code reproduces the
-published spectra bit for bit.
+to a bare clone of upstream v3.2.0, it reconstructs our working tree up to
+comments and whitespace, and the reconstructed code reproduces the outputs of
+that tree bit for bit. The `md5` checks above test the reference spectra.
+
+Version 1.0.1 corrects the baryon density passed to HyRec, which changes the
+outputs for `lambda_G != 1`. The checksums are those of v1.0.1. See
+`MODIFICATIONS.md` and `../CHANGELOG.md`.
 
 ## Using this model
 
@@ -73,5 +76,5 @@ If you use `1GNT-alpha-BBN`, please cite
 - Lamine, B., Ozdalkiran, Y., Mirouze, L., et al. 2025, A&A, 697, A109,
   for the treatment of a varying gravitational constant in CLASS,
 - Lamine, B., Beauchamp, S., Blanchard, A., et al., for this model,
-  submitted to A&A,
+  submitted to PRD,
 - and the Zenodo DOI of the release you used.

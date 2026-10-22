@@ -87,7 +87,9 @@ error outside that interval rather than extrapolating. See `../bbn/README.md`.
 
 ## Non-regression check
 
-`CHECKSUMS.md5` holds the md5 of the lensed CMB spectra of the reference runs.
+`CHECKSUMS.md5` holds the md5 of the lensed CMB spectra of the reference runs,
+computed with v1.0.1 of the patch. Those of v1.0.0 differ for every
+`lambda_G != 1`, see `../MODIFICATIONS.md`.
 After building the code with `build.sh`, run the files and check that you
 recover them,
 
@@ -102,3 +104,10 @@ reason to look, not necessarily a reason to worry. A difference in the last
 digits of a few multipoles will break an md5 while being physically
 irrelevant. If a checksum fails, compare the spectra numerically before
 concluding anything.
+
+The checksums were computed on the Titan2 cluster of the Observatoire
+Midi-Pyrénées. A build of v1.0.1 on another machine (Ubuntu 24.04, gcc 13.3)
+reproduces five of the ten. For `lambda_G = 0.25`, one of those that do not
+match, the TT, EE, TE and BB columns are identical to every digit, and only
+the last digit of the lensing potential differs, at 20 of the 2999 multipoles
+and by at most `3e-12` in relative terms.

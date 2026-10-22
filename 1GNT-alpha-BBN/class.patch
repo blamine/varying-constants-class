@@ -1,7 +1,89 @@
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/include/background.h class_mod_1GNT/include/background.h
---- class_pristine/include/background.h	2026-10-12 01:06:36.967196580 +0200
-+++ class_mod_1GNT/include/background.h	2026-04-23 15:07:09.560796674 +0200
-@@ -123,6 +123,7 @@
+diff --git a/external/HyRec2020/wrap_hyrec.c b/external/HyRec2020/wrap_hyrec.c
+index fa44c77..58fcc04 100644
+--- a/external/HyRec2020/wrap_hyrec.c
++++ b/external/HyRec2020/wrap_hyrec.c
+@@ -49,7 +49,9 @@ int thermodynamics_hyrec_init(struct precision* ppr, struct background * pba, st
+ 
+   /** - set cosmological parameters for hyrec */
+   phy->data->cosmo->T0 = T_cmb;
+-  phy->data->cosmo->obh2 = pba->Omega0_b*pba->h*pba->h;
++  /* 1GNT: obh2 enters the SWIFT correction as a proxy for the hydrogen number density,
++     so it must be the physical one, i.e. Omega0_b h^2 divided by lambda_G^2 */
++  phy->data->cosmo->obh2 = pba->Omega0_b*pba->h*pba->h/pba->lambda_G/pba->lambda_G;
+   phy->data->cosmo->ocbh2 = pba->Omega0_nfsm*pba->h*pba->h;
+ 
+   phy->data->cosmo->YHe = pth->YHe;
+diff --git a/external/heating/injection.c b/external/heating/injection.c
+index 788d938..33270b9 100644
+--- a/external/heating/injection.c
++++ b/external/heating/injection.c
+@@ -48,7 +48,8 @@ int injection_init(struct precision * ppr,
+   pin->T_g0 = pba->T_cmb;                                                                           // [K]
+   pin->Omega0_b = pba->Omega0_b;                                                                    // [-]
+   pin->Omega0_cdm = pba->Omega0_cdm;                                                                // [-]
+-  pin->rho0_cdm = pba->Omega0_cdm*pow(pin->H0,2)*3/8./_PI_/_G_*_c_*_c_;                             // [J/m^3]
++  /* 1GNT: physical density, hence G = lambda_G^2 G_N (Omega0_cdm is defined with G) */
++  pin->rho0_cdm = pba->Omega0_cdm*pow(pin->H0,2)*3/8./_PI_/(pow(pba->lambda_G,2)*_G_)*_c_*_c_;                             // [J/m^3]
+ 
+   /* Thermodynamics structure */
+   pin->fHe = pth->fHe;                                                                              // [-]
+@@ -79,6 +80,15 @@ int injection_init(struct precision * ppr,
+              pin->error_message,
+              pin->error_message);
+ 
++  /* 1GNT: the PBH evaporation and accretion rates contain the local gravitational constant
++     (Hawking temperature and mass loss rate, Eddington luminosity, Bondi radius), both explicitly
++     through _G_ and implicitly through hard-coded numerical factors. These have not been adapted
++     to lambda_G, so we forbid these channels when lambda_G differs from 1. */
++  class_test(((pin->has_PBH_eva == _TRUE_) || (pin->has_PBH_acc == _TRUE_)) && (pba->lambda_G != 1.),
++             pin->error_message,
++             "PBH evaporation/accretion have not been adapted to lambda_G != 1 (here lambda_G = %g). Set PBH_evaporation_fraction and PBH_accretion_fraction to zero.",
++             pba->lambda_G);
++
+   /** - Initialize energy injection table */
+   /* Allocate space */
+   class_alloc(pin->injection_table,
+@@ -291,9 +301,9 @@ int injection_calculate_at_z(struct background* pba,
+   pin->H = pvecback[pba->index_bg_H]*_c_/_Mpc_over_m_;                                              // [1/s]
+   pin->a = pvecback[pba->index_bg_a];                                                               // [-]
+   pin->t = pvecback[pba->index_bg_time]/_s_over_Mpc_;                                               // [s]
+-  pin->rho_cdm = pvecback[pba->index_bg_rho_cdm]*_Jm3_over_Mpc2_;                                   // [J/m^3]
+-  pin->rho_g = pvecback[pba->index_bg_rho_g]*_Jm3_over_Mpc2_;                                       // [J/m^3]
+-  pin->rho_b = pvecback[pba->index_bg_rho_b]*_Jm3_over_Mpc2_;                                       // [J/m^3]
++  pin->rho_cdm = pvecback[pba->index_bg_rho_cdm]*_Jm3_over_Mpc2_/pow(pba->lambda_G,2);  /* 1GNT: physical density */                                   // [J/m^3]
++  pin->rho_g = pvecback[pba->index_bg_rho_g]*_Jm3_over_Mpc2_/pow(pba->lambda_G,2);  /* 1GNT: physical density */                                       // [J/m^3]
++  pin->rho_b = pvecback[pba->index_bg_rho_b]*_Jm3_over_Mpc2_/pow(pba->lambda_G,2);  /* 1GNT: physical density */                                       // [J/m^3]
+ 
+   /** - Hunt within the redshift table for the given index of deposition */
+   class_call(array_spline_hunt(pin->z_table,
+diff --git a/external/heating/noninjection.c b/external/heating/noninjection.c
+index 1d1627d..5d427ae 100644
+--- a/external/heating/noninjection.c
++++ b/external/heating/noninjection.c
+@@ -145,7 +145,8 @@ int noninjection_init(struct precision* ppr,
+   pni->T_g0 = pba->T_cmb;                                                                           // [K]
+   pni->Omega0_b = pba->Omega0_b;                                                                    // [-]
+   pni->Omega0_cdm = pba->Omega0_cdm;                                                                // [-]
+-  pni->rho0_cdm = pba->Omega0_cdm*pow(pni->H0,2)*3/8./_PI_/_G_*_c_*_c_;                             // [J/m^3]
++  /* 1GNT: physical density, hence G = lambda_G^2 G_N (Omega0_cdm is defined with G) */
++  pni->rho0_cdm = pba->Omega0_cdm*pow(pni->H0,2)*3/8./_PI_/(pow(pba->lambda_G,2)*_G_)*_c_*_c_;                             // [J/m^3]
+ 
+   /* Thermodynamics structure */
+   pni->fHe = pth->fHe;                                                                              // [-]
+@@ -170,7 +171,7 @@ int noninjection_init(struct precision* ppr,
+ 
+     pni->H = pvecback[pba->index_bg_H]*_c_/_Mpc_over_m_;                                            // [1/s]
+     pni->a = pvecback[pba->index_bg_a];                                                             // [-]
+-    pni->rho_g = pvecback[pba->index_bg_rho_g]*_Jm3_over_Mpc2_;                                     // [J/m^3]
++    pni->rho_g = pvecback[pba->index_bg_rho_g]*_Jm3_over_Mpc2_/pow(pba->lambda_G,2);  /* 1GNT: physical density */                                     // [J/m^3]
+     R = (3./4.)*pvecback[pba->index_bg_rho_b]/pvecback[pba->index_bg_rho_g];                        // [-]
+     pni->nH = pni->N_e0*pow(pni->a,-3);
+ 
+diff --git a/include/background.h b/include/background.h
+index 809c126..ad7d557 100644
+--- a/include/background.h
++++ b/include/background.h
+@@ -123,6 +123,7 @@ struct background
    double phi_prime_ini_scf;/**< \f$ d\phi(t_0)/d\tau \f$: scalar field initial derivative wrt conformal time */
    int scf_parameters_size; /**< size of scf_parameters */
    double varconst_alpha; /**< finestructure constant for varying fundamental constants */
@@ -9,7 +91,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    double varconst_me; /**< electron mass for varying fundamental constants */
    enum varconst_dependence varconst_dep; /**< dependence of the varying fundamental constants as a function of time */
    double varconst_transition_redshift; /**< redshift of transition between varied fundamental constants and normal fundamental constants in the 'varconst_instant' case*/
-@@ -210,6 +211,7 @@
+@@ -210,6 +211,7 @@ struct background
    int index_bg_f;             /**< corresponding velocity growth factor [dlnD]/[dln a] */
  
    int index_bg_varc_alpha;    /**< value of fine structure constant in varying fundamental constants */
@@ -17,7 +99,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    int index_bg_varc_me;      /**< value of effective electron mass in varying fundamental constants */
  
    int bg_size_short;  /**< size of background vector in the "short format" */
-@@ -427,6 +429,7 @@
+@@ -427,6 +429,7 @@ extern "C" {
                                 struct background* pba,
                                 double z,
                                 double* alpha,
@@ -25,10 +107,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                 double* me
                                 );
  
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/include/precisions.h class_mod_1GNT/include/precisions.h
---- class_pristine/include/precisions.h	2026-10-12 01:06:36.983196580 +0200
-+++ class_mod_1GNT/include/precisions.h	2026-04-23 15:07:09.579796674 +0200
-@@ -108,7 +108,7 @@
+diff --git a/include/precisions.h b/include/precisions.h
+index 56dbb60..8439d73 100644
+--- a/include/precisions.h
++++ b/include/precisions.h
+@@ -108,7 +108,7 @@ class_precision_parameter(M_nfsm_threshold,double,1.e4)
   * Big Bang Nucleosynthesis file path. The file specifies the predictions for
   * \f$ Y_\mathrm{He} \f$ for given \f$ \omega_b \f$ and \f$ N_\mathrm{eff} \f$.
   */
@@ -37,10 +120,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
  /*
   *  Thermodynamical quantities
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/include/primordial.h class_mod_1GNT/include/primordial.h
---- class_pristine/include/primordial.h	2026-10-12 01:06:36.985196580 +0200
-+++ class_mod_1GNT/include/primordial.h	2026-04-23 15:07:09.580796674 +0200
-@@ -348,6 +348,7 @@
+diff --git a/include/primordial.h b/include/primordial.h
+index 7c4fe94..4931441 100644
+--- a/include/primordial.h
++++ b/include/primordial.h
+@@ -348,6 +348,7 @@ extern "C" {
  
    int primordial_init(
                        struct precision  * ppr,
@@ -48,7 +132,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                        struct perturbations   * ppt,
                        struct primordial * ppm
                        );
-@@ -404,6 +405,7 @@
+@@ -404,6 +405,7 @@ extern "C" {
  
    int primordial_inflation_solve_inflation(
                                             struct perturbations * ppt,
@@ -56,7 +140,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                             struct primordial * ppm,
                                             struct precision * ppr
                                             );
-@@ -488,6 +490,7 @@
+@@ -488,6 +490,7 @@ extern "C" {
  
    int primordial_inflation_find_phi_pivot(
                                            struct primordial * ppm,
@@ -64,10 +148,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                            struct precision * ppr,
                                            double * y,
                                            double * dy
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/main/class.c class_mod_1GNT/main/class.c
---- class_pristine/main/class.c	2026-10-12 01:06:36.991196580 +0200
-+++ class_mod_1GNT/main/class.c	2026-04-23 15:07:09.589796674 +0200
-@@ -39,7 +39,7 @@
+diff --git a/main/class.c b/main/class.c
+index a94ae6e..15a36a0 100644
+--- a/main/class.c
++++ b/main/class.c
+@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
      return _FAILURE_;
    }
  
@@ -76,10 +161,64 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
      printf("\n\nError in primordial_init \n=>%s\n",pm.error_message);
      return _FAILURE_;
    }
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/source/background.c class_mod_1GNT/source/background.c
---- class_pristine/source/background.c	2026-10-12 01:06:37.069196579 +0200
-+++ class_mod_1GNT/source/background.c	2026-10-12 01:11:23.482193175 +0200
-@@ -631,6 +631,7 @@
+diff --git a/python/cclassy.pxd b/python/cclassy.pxd
+index 1d9963f..470b401 100644
+--- a/python/cclassy.pxd
++++ b/python/cclassy.pxd
+@@ -88,6 +88,7 @@ cdef extern from "class.h":
+         double Omega0_idr
+         double T_idr
+         double Omega0_cdm
++        double lambda_G
+         double Omega0_idm
+         double Omega0_dcdm
+         double Omega0_ncdm_tot
+@@ -450,7 +451,7 @@ cdef extern from "class.h":
+     int background_init(void*,void*)
+     int thermodynamics_init(void*,void*,void*)
+     int perturbations_init(void*,void*,void*,void*)
+-    int primordial_init(void*,void*,void*)
++    int primordial_init(void*,void*,void*,void*)
+     int fourier_init(void*,void*,void*,void*,void*,void*)
+     int transfer_init(void*,void*,void*,void*,void*,void*)
+     int harmonic_init(void*,void*,void*,void*,void*,void*,void*)
+diff --git a/python/classy.pyx b/python/classy.pyx
+index 4d178b6..544e793 100644
+--- a/python/classy.pyx
++++ b/python/classy.pyx
+@@ -397,7 +397,7 @@ cdef class Class:
+             self.ncp.add("perturb")
+ 
+         if "primordial" in level:
+-            if primordial_init(&(self.pr), &(self.pt),
++            if primordial_init(&(self.pr), &(self.ba), &(self.pt),
+                                &(self.pm)) == _FAILURE_:
+                 self.struct_cleanup()
+                 raise CosmoComputationError(self.pm.error_message)
+@@ -1393,6 +1393,9 @@ cdef class Class:
+     def Omega_Lambda(self):
+         return self.ba.Omega0_lambda
+ 
++    def lambda_G(self):
++        return self.ba.lambda_G
++
+     def Omega_g(self):
+         return self.ba.Omega0_g
+ 
+@@ -2223,6 +2226,8 @@ cdef class Class:
+                 value = self.ba.Omega0_lambda
+             elif name == 'Omega0_fld':
+                 value = self.ba.Omega0_fld
++            elif name == 'lambda_G':
++                value = self.ba.lambda_G
+             elif name == 'age':
+                 value = self.ba.age
+             elif name == 'conformal_age':
+diff --git a/source/background.c b/source/background.c
+index 1ef0924..112263d 100644
+--- a/source/background.c
++++ b/source/background.c
+@@ -631,6 +631,7 @@ int background_functions(
        class_call(background_varconst_of_z(pba,
                                            1./a-1.,
                                            &(pvecback[pba->index_bg_varc_alpha]),
@@ -87,7 +226,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                            &(pvecback[pba->index_bg_varc_me])
                                            ),
                   pba->error_message,
-@@ -767,6 +768,7 @@
+@@ -767,6 +768,7 @@ int background_varconst_of_z(
                               struct background* pba,
                               double z,
                               double* alpha,
@@ -95,7 +234,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                               double* me
                               ){
  
-@@ -774,16 +776,19 @@
+@@ -774,16 +776,19 @@ int background_varconst_of_z(
  
    case varconst_none:
      *alpha = 1.;
@@ -115,7 +254,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
        *me = 1.;
      }
      break;
-@@ -1134,6 +1139,8 @@
+@@ -1134,6 +1139,8 @@ int background_indices(
    /* -> varying fundamental constant -- alpha (fine structure) */
    class_define_index(pba->index_bg_varc_alpha,pba->has_varconst,index_bg,1);
  
@@ -124,7 +263,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    /* -> varying fundamental constant -- me (effective electron mass) */
    class_define_index(pba->index_bg_varc_me,pba->has_varconst,index_bg,1);
  
-@@ -1559,7 +1566,7 @@
+@@ -1559,7 +1566,7 @@ int background_ncdm_init(
          pba->dlnf0_dlnq_ncdm[k][index_q] = q/f0*df0dq;
      }
  
@@ -133,7 +272,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
        /3./pow(_h_P_/2./_PI_,3)/pow(_c_,7)*_Mpc_over_m_*_Mpc_over_m_;
  
      /* If allocated, deallocate interpolation table:  */
-@@ -1836,7 +1843,7 @@
+@@ -1836,7 +1843,7 @@ int background_checks(
             density of one neutrino in the instantaneous decoupling
             limit, i.e. assuming T_nu=(4/11)^1/3 T_gamma (this comes
             from the definition of N_eff) */
@@ -142,7 +281,15 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
            pow(_Mpc_over_m_,2)*pow(pba->T_cmb*_k_B_,4);
  
          printf(" -> ncdm species i=%d sampled with %d (resp. %d) points for purpose of background (resp. perturbation) integration. In the relativistic limit it gives Delta N_eff = %g\n",
-@@ -2545,6 +2552,7 @@
+@@ -2472,6 +2479,7 @@ int background_output_titles(
+   class_store_columntitle(titles,"gr.fac. f",_TRUE_);
+ 
+   class_store_columntitle(titles,"rel. alpha",pba->has_varconst);
++  class_store_columntitle(titles,"lambda_G",pba->has_varconst);
+   class_store_columntitle(titles,"rel. m_e",pba->has_varconst);
+ 
+   return _SUCCESS_;
+@@ -2545,6 +2553,7 @@ int background_output_data(
      class_store_double(dataptr,pvecback[pba->index_bg_f],_TRUE_,storeidx);
  
      class_store_double(dataptr,pvecback[pba->index_bg_varc_alpha],pba->has_varconst,storeidx);
@@ -150,10 +297,24 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
      class_store_double(dataptr,pvecback[pba->index_bg_varc_me],pba->has_varconst,storeidx);
    }
  
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/source/fourier.c class_mod_1GNT/source/fourier.c
---- class_pristine/source/fourier.c	2026-10-12 01:06:37.074196579 +0200
-+++ class_mod_1GNT/source/fourier.c	2026-10-12 02:04:40.501155171 +0200
-@@ -3201,7 +3201,9 @@
+diff --git a/source/distortions.c b/source/distortions.c
+index 507629d..7b6922e 100644
+--- a/source/distortions.c
++++ b/source/distortions.c
+@@ -833,7 +833,7 @@ int distortions_compute_heating_rate(struct precision* ppr,
+                psd->error_message);
+     H = pvecback[pba->index_bg_H]*_c_/_Mpc_over_m_;               // [1/s]
+     a = pvecback[pba->index_bg_a];                                // [-]
+-    rho_g = pvecback[pba->index_bg_rho_g]*_Jm3_over_Mpc2_;        // [J/m^3]
++    rho_g = pvecback[pba->index_bg_rho_g]*_Jm3_over_Mpc2_/pow(pba->lambda_G,2);  /* 1GNT: physical density */        // [J/m^3]
+ 
+     heat = 0;
+ 
+diff --git a/source/fourier.c b/source/fourier.c
+index cd534ac..1b25f2d 100644
+--- a/source/fourier.c
++++ b/source/fourier.c
+@@ -3201,7 +3201,9 @@ int fourier_hmcode(
    z_at_tau = 1./pvecback[pba->index_bg_a]-1.;
  
    /* The number below is the critical density today, rho_c = 3 * H0^2 / 8*pi*G, in units of M_sun over Mpc^3 */
@@ -164,10 +325,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    free(pvecback);
  
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/source/input.c class_mod_1GNT/source/input.c
---- class_pristine/source/input.c	2026-10-12 01:06:37.079196579 +0200
-+++ class_mod_1GNT/source/input.c	2026-04-23 15:07:09.740796672 +0200
-@@ -1394,7 +1394,7 @@
+diff --git a/source/input.c b/source/input.c
+index 6f3e3c8..657c41a 100644
+--- a/source/input.c
++++ b/source/input.c
+@@ -1394,7 +1394,7 @@ int input_try_unknown_parameters(double * unknown_parameter,
      if (input_verbose>2)
        printf("Stage 4: primordial\n");
      pm.primordial_verbose = 0;
@@ -176,7 +338,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    }
  
    if (pfzw->required_computation_stage >= cs_nonlinear){
-@@ -2258,6 +2258,7 @@
+@@ -2258,6 +2258,7 @@ int input_read_parameters_general(struct file_content * pfc,
      /* 10.a) Instantaneous transition from specified values to unity at given transition redshift */
    case varconst_instant:
      class_read_double("varying_alpha",pba->varconst_alpha);
@@ -184,7 +346,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
      class_read_double("varying_me",pba->varconst_me);
      class_read_double("varying_transition_redshift",pba->varconst_transition_redshift);
      break;
-@@ -2334,20 +2335,20 @@
+@@ -2334,20 +2335,20 @@ int input_read_parameters_species(struct file_content * pfc,
       rho_g = (4 sigma_B/c) T^4
       rho_c0 = 3 c^2 H_0^2/(8 \pi G) */
    if (class_none_of_three(flag1,flag2,flag3)){
@@ -209,7 +371,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
      }
    }
    class_test(pba->Omega0_g<0,errmsg,"You cannot set the photon density to negative values.");
-@@ -5665,6 +5666,7 @@
+@@ -5665,6 +5666,7 @@ int input_default_params(struct background *pba,
    /** 10) Varying fundamental constants */
    pba->varconst_dep = varconst_none;
    pba->varconst_alpha = 1.;
@@ -217,7 +379,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    pba->varconst_me = 1.;
    pth->bbn_alpha_sensitivity = 1.;
    pba->varconst_transition_redshift = 50.;
-@@ -5675,7 +5677,7 @@
+@@ -5675,7 +5677,7 @@ int input_default_params(struct background *pba,
  
    /** 1) Photon density */
    pba->T_cmb = 2.7255;
@@ -226,10 +388,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    /** 2) Baryon density */
    pba->Omega0_b = 0.02238280/pow(pba->h,2);
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/source/perturbations.c class_mod_1GNT/source/perturbations.c
---- class_pristine/source/perturbations.c	2026-10-12 01:06:37.086196579 +0200
-+++ class_mod_1GNT/source/perturbations.c	2026-04-23 15:07:09.742796672 +0200
-@@ -8933,7 +8933,7 @@
+diff --git a/source/perturbations.c b/source/perturbations.c
+index db8d7fe..f80b7f4 100644
+--- a/source/perturbations.c
++++ b/source/perturbations.c
+@@ -8933,7 +8933,7 @@ int perturbations_derivs(double tau,
        H0 = pba->H0 * _c_ / _Mpc_over_m_;
  
        //Computation of Nnow in SI units
@@ -238,10 +401,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
        // total amount of hydrogen today
        n_H = Nnow/pow(a,3);
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/source/primordial.c class_mod_1GNT/source/primordial.c
---- class_pristine/source/primordial.c	2026-10-12 01:06:37.088196579 +0200
-+++ class_mod_1GNT/source/primordial.c	2026-10-12 01:23:32.432184509 +0200
-@@ -185,6 +185,7 @@
+diff --git a/source/primordial.c b/source/primordial.c
+index 181ad29..2dfd31a 100644
+--- a/source/primordial.c
++++ b/source/primordial.c
+@@ -185,6 +185,7 @@ int primordial_spectrum_at_k(
  
  int primordial_init(
                      struct precision  * ppr,
@@ -249,7 +413,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                      struct perturbations   * ppt,
                      struct primordial * ppm
                      ) {
-@@ -367,7 +368,7 @@
+@@ -367,7 +368,7 @@ int primordial_init(
      if (ppm->primordial_verbose > 0)
        printf(" (simulating inflation)\n");
  
@@ -258,7 +422,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                        ppm->error_message,
                        ppm->error_message,
                        primordial_free(ppm));
-@@ -1133,6 +1134,7 @@
+@@ -1133,6 +1134,7 @@ int primordial_inflation_indices(
  
  int primordial_inflation_solve_inflation(
                                           struct perturbations * ppt,
@@ -266,7 +430,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                           struct primordial * ppm,
                                           struct precision *ppr
                                           ) {
-@@ -1161,7 +1163,7 @@
+@@ -1161,7 +1163,7 @@ int primordial_inflation_solve_inflation(
    /** - eventually, needs first to find phi_pivot */
    if (ppm->primordial_spec_type == inflation_V_end) {
  
@@ -275,7 +439,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                 ppm->error_message,
                 ppm->error_message);
  
-@@ -2538,6 +2540,7 @@
+@@ -2538,6 +2540,7 @@ int primordial_inflation_get_epsilon(
  
  int primordial_inflation_find_phi_pivot(
                                          struct primordial * ppm,
@@ -283,7 +447,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                          struct precision * ppr,
                                          double * y,
                                          double * dy
-@@ -2645,13 +2648,12 @@
+@@ -2645,13 +2648,12 @@ int primordial_inflation_find_phi_pivot(
        /* get the target value of ln_aH_ratio */
  
        rho_end = 2./8./_PI_*pow(dy[ppm->index_in_a]/y[ppm->index_in_a],2);
@@ -299,10 +463,11 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
        Omega_r0 = 3.044*7./8.*pow(4./11.,4./3.)*Omega_g0;
  
        target = log(H0/0.05*pow(Omega_r0,0.5)*pow(2./100.,1./12.)*pow(rho_end/rho_c0,0.25));
-diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--exclude=__pycache__' '--exclude=*.pyc' class_pristine/source/thermodynamics.c class_mod_1GNT/source/thermodynamics.c
---- class_pristine/source/thermodynamics.c	2026-10-12 01:06:37.090196579 +0200
-+++ class_mod_1GNT/source/thermodynamics.c	2026-04-27 11:30:34.633842973 +0200
-@@ -71,7 +71,7 @@
+diff --git a/source/thermodynamics.c b/source/thermodynamics.c
+index 42f29c2..a30d312 100644
+--- a/source/thermodynamics.c
++++ b/source/thermodynamics.c
+@@ -71,7 +71,7 @@ int thermodynamics_at_z(
    /* Dark matter baryon scattering */
    double Vrms_idm_b2, T_diff_idm_b, m_b, FHe;
    /* Varying fundamental constants */
@@ -311,7 +476,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    /* The fact that z is in the pre-computed range 0 <= z <= z_initial will be checked in the interpolation routines below. Before
       trying to interpolate, allow the routine to deal with the case z > z_initial: then, all relevant quantities can be extrapolated
-@@ -85,7 +85,7 @@
+@@ -85,7 +85,7 @@ int thermodynamics_at_z(
  
      /* In the case of varying fundamental constants, compute correction factor (according to 1705.03925) */
      if (pth->has_varconst == _TRUE_) {
@@ -320,7 +485,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                   pba->error_message,
                   pth->error_message);
        sigmaTrescale = alpha*alpha/me/me;
-@@ -154,7 +154,7 @@
+@@ -154,7 +154,7 @@ int thermodynamics_at_z(
        /* For DM-g calculate at early times the optical depth parameters */
        if (pth->has_idm_g == _TRUE_) {
          /* calculate dmu_idm_g and its derivatives */
@@ -329,7 +494,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
          pvecthermo[pth->index_th_ddmu_idm_g] = -(2.+pth->n_index_idm_g) * pvecback[pba->index_bg_H] * pvecback[pba->index_bg_a] * pvecthermo[pth->index_th_dmu_idm_g];
          pvecthermo[pth->index_th_dddmu_idm_g] = (2.+pth->n_index_idm_g)*pvecthermo[pth->index_th_dmu_idm_g]/(1.+z) *
            (pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]/(1.+z) * (1.+pth->n_index_idm_g) - pvecback[pba->index_bg_H_prime]);
-@@ -179,7 +179,7 @@
+@@ -179,7 +179,7 @@ int thermodynamics_at_z(
          /* Now compute the coupling coefficients */
          pvecthermo[pth->index_th_R_idm_b] = (pvecback[pba->index_bg_a]*pvecback[pba->index_bg_rho_b]*pth->cross_idm_b*pth->n_coeff_idm_b/(m_b+pth->m_idm))
            *pow(T_diff_idm_b,(pth->n_index_idm_b+1.0)/2.0)*FHe
@@ -338,7 +503,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
          pvecthermo[pth->index_th_dR_idm_b] = pvecthermo[pth->index_th_R_idm_b] * pvecback[pba->index_bg_a] * pvecback[pba->index_bg_H]
            * ( -2. - (1.+z) * (pth->n_index_idm_b+1.0)/2.0 * (pba->T_cmb*_k_B_/_eV_/m_b + pba->T_cmb*_k_B_/_eV_/pth->m_idm)/T_diff_idm_b);
        }
-@@ -352,7 +352,7 @@
+@@ -352,7 +352,7 @@ int thermodynamics_init(
    pth->fHe = pth->YHe/(_not4_ *(1.-pth->YHe));
  
    /** - infer number of hydrogen nuclei today in m**-3 */
@@ -347,7 +512,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    /** - test whether all parameters are in the correct regime */
    class_call(thermodynamics_checks(ppr,pba,pth),
-@@ -485,20 +485,19 @@
+@@ -485,20 +485,19 @@ int thermodynamics_helium_from_bbn(
    char * left;
  
    int num_omegab=0;
@@ -373,7 +538,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    /** - Infer effective number of neutrinos at the time of BBN */
    class_alloc(pvecback,pba->bg_size*sizeof(double),pba->error_message);
-@@ -515,12 +514,10 @@
+@@ -515,12 +514,10 @@ int thermodynamics_helium_from_bbn(
               pba->error_message,
               pth->error_message);
  
@@ -388,7 +553,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    //  printf("Neff early = %g, Neff at bbn: %g\n",pba->Neff,Neff_bbn);
  
-@@ -528,7 +525,7 @@
+@@ -528,7 +525,7 @@ int thermodynamics_helium_from_bbn(
     * Note that even if 3.044 is a better default value, we must keep 3.046 here as long as the BBN file we are
     * using has been computed assuming 3.046.
     */
@@ -397,7 +562,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    /* the following file is assumed to contain (apart from comments and blank lines):
       - the two numbers (num_omegab, num_deltaN) = number of values of BBN free parameters
-@@ -557,33 +554,33 @@
+@@ -557,33 +554,33 @@ int thermodynamics_helium_from_bbn(
         be the beginning of some data (it is not a newline, a #, a %, etc.) */
      if (left[0] > 39) {
  
@@ -444,7 +609,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
          array_line ++;
        }
      }
-@@ -591,9 +588,9 @@
+@@ -591,9 +588,9 @@ int thermodynamics_helium_from_bbn(
  
    fclose(fA);
  
@@ -457,7 +622,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                        YHe,
                                        num_omegab,
                                        ddYHe,
-@@ -602,7 +599,9 @@
+@@ -602,7 +599,9 @@ int thermodynamics_helium_from_bbn(
               pth->error_message,
               pth->error_message);
  
@@ -468,7 +633,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    class_test(omega_b < omegab[0],
               pth->error_message,
-@@ -614,25 +613,27 @@
+@@ -614,25 +613,27 @@ int thermodynamics_helium_from_bbn(
               "You have asked for an unrealistic high value omega_b = %e. The corresponding value of the primordial helium fraction cannot be found in the interpolation table. If you really want this value, you should fix YHe to a given value rather than to BBN",
               omega_b);
  
@@ -511,7 +676,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                        num_omegab,
                                        pth->error_message),
               pth->error_message,
-@@ -641,9 +642,9 @@
+@@ -641,9 +642,9 @@ int thermodynamics_helium_from_bbn(
    /** - spline in remaining dimension (along omegab) */
    class_call(array_spline_table_lines(omegab,
                                        num_omegab,
@@ -523,7 +688,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                        _SPLINE_NATURAL_,
                                        pth->error_message),
               pth->error_message,
-@@ -652,8 +653,8 @@
+@@ -652,8 +653,8 @@ int thermodynamics_helium_from_bbn(
    /** - interpolate in remaining dimension (along omegab) */
    class_call(array_interpolate_spline(omegab,
                                        num_omegab,
@@ -534,7 +699,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                                        1,
                                        omega_b,
                                        &last_index,
-@@ -670,11 +671,13 @@
+@@ -670,11 +671,13 @@ int thermodynamics_helium_from_bbn(
  
    /** - deallocate arrays */
    free(omegab);
@@ -551,7 +716,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    return _SUCCESS_;
  }
-@@ -740,7 +743,7 @@
+@@ -740,7 +743,7 @@ int thermodynamics_workspace_init(
    /** Define local variables */
    int index_ap;
    /* for varying fundamental constants */
@@ -560,7 +725,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
    /** - number of z values */
    ptw->Nz_reco_lin = ppr->thermo_Nz_lin;
-@@ -758,7 +761,7 @@
+@@ -758,7 +761,7 @@ int thermodynamics_workspace_init(
    /* Hubble parameter today in SI units */
    ptw->SIunit_H0 = pba->H0 * _c_ / _Mpc_over_m_;
    /* H number density today in SI units*/
@@ -569,7 +734,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    /* CMB temperature today in Kelvin */
    ptw->Tcmb = pba->T_cmb;
  
-@@ -824,7 +827,7 @@
+@@ -824,7 +827,7 @@ int thermodynamics_workspace_init(
    /** - Rescale these redshifts in case of varying fundamental constants */
    if (pth->has_varconst == _TRUE_) {
      for (index_ap=0;index_ap<ptw->ptdw->ap_size;++index_ap){
@@ -578,7 +743,18 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                   pba->error_message,
                   pth->error_message);
        ptw->ptdw->ap_z_limits[index_ap]*=me*alpha*alpha;
-@@ -2857,7 +2860,7 @@
+@@ -2655,7 +2658,9 @@ int thermodynamics_derivs(
+      rate_gamma_b = 2 * mu_bar / m_e * R_g =  2 * (sigma_T/m_e) * (4/3 * rho_g) * x / (1. + f + x)
+   */
+   /* Photon-Baryon temperature change rate  */
+-  rate_gamma_b = ( 2. * _sigma_/_m_e_/_c_ ) * ( 4./3. * pvecback[pba->index_bg_rho_g] * _Jm3_over_Mpc2_ ) * x / (1.+x+ptw->fHe);
++  /* 1GNT: _Jm3_over_Mpc2_ = 3c^4/(8 pi G_N Mpc^2) converts a CLASS density into a physical one only if G = G_N;
++     here rho_g[CLASS] carries lambda_G^2 G_N, hence the division by lambda_G^2 */
++  rate_gamma_b = ( 2. * _sigma_/_m_e_/_c_ ) * ( 4./3. * pvecback[pba->index_bg_rho_g] * _Jm3_over_Mpc2_/pow(pba->lambda_G,2) ) * x / (1.+x+ptw->fHe);
+   if (pth->has_varconst == _TRUE_) {
+     rate_gamma_b *= rescale_rate;
+   }
+@@ -2857,7 +2862,7 @@ int thermodynamics_sources(
    /* Shorthand notations */
    double z,x=0.,Tmat,Trad,dTmat;
    /* Varying fundamental constants */
@@ -587,7 +763,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
    /* Recfast smoothing */
    double x_previous, weight,s;
    /* Structures as shorthand_notation */
-@@ -2905,7 +2908,7 @@
+@@ -2905,7 +2910,7 @@ int thermodynamics_sources(
  
    /* Get sigmaT rescale factor from fundamental constants */
    if (pth->has_varconst == _TRUE_) {
@@ -596,7 +772,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                 pba->error_message,
                 pth->error_message);
      sigmaTrescale = alpha*alpha/me/me;
-@@ -3920,10 +3923,10 @@
+@@ -3920,10 +3925,10 @@ int thermodynamics_ionization_fractions(
  
    /* Varying fundamental constants (according to 1705.03925) */
    double rescale_rhs = 1., rescale_T = 1.;
@@ -609,7 +785,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
                 pba->error_message,
                 pth->error_message);
      rescale_rhs = alpha*alpha*alpha*me*me*me;
-@@ -4501,7 +4504,7 @@
+@@ -4501,7 +4506,7 @@ int thermodynamics_idm_quantities(struct background * pba,
      /* Now add also coupling to photons*/
      if (pth->has_idm_g == _TRUE_) {
        /* - photon interaction rate with idm_g */
@@ -618,7 +794,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
        ptdw->T_idm_prime += - 2.*4./3. * pvecback[pba->index_bg_rho_g]/pvecback[pba->index_bg_rho_idm] * ptdw->dmu_idm_g * (ptdw->T_idm  - T_g) / pvecback[pba->index_bg_H];
      }
      /* Now add also coupling to dark radiation */
-@@ -4526,7 +4529,7 @@
+@@ -4526,7 +4531,7 @@ int thermodynamics_idm_quantities(struct background * pba,
  
        ptdw->R_idm_b = (pvecback[pba->index_bg_a]*pvecback[pba->index_bg_rho_b]*pth->cross_idm_b*pth->n_coeff_idm_b/(m_b+pth->m_idm))
          *pow(T_diff_idm_b,(pth->n_index_idm_b+1.0)/2.0)*FHe
@@ -627,7 +803,7 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
  
        ptdw->T_idm_prime += -2.*pth->m_idm/(pth->m_idm + m_b)*ptdw->R_idm_b*(ptdw->T_idm-Tmat) / pvecback[pba->index_bg_H];
      }
-@@ -4707,7 +4710,7 @@
+@@ -4707,7 +4712,7 @@ int thermodynamics_idm_initial_temperature(
      T_diff_idm_b = (pba->T_cmb*(1.+z_ini)*_k_B_/_eV_/m_b)+(pba->T_cmb*(1.+z_ini)*_k_B_/_eV_/pth->m_idm)+(1.e-8/3.0);
      ptdw->R_idm_b = (pvecback[pba->index_bg_a]*pvecback[pba->index_bg_rho_b]*pth->cross_idm_b*pth->n_coeff_idm_b/(m_b+pth->m_idm))
        *pow(T_diff_idm_b,(pth->n_index_idm_b+1.0)/2.0)*FHe
@@ -636,22 +812,3 @@ diff -ruN '--exclude=*.o' '--exclude=*.a' '--exclude=*.so' '--exclude=*.mod' '--
      alpha = 2.*pth->m_idm/(pth->m_idm + m_b)*ptdw->R_idm_b;
    }
  
---- class_pristine/python/cclassy.pxd	2026-10-12 01:06:37.051196579 +0200
-+++ class_mod_1GNT/python/cclassy.pxd	2026-04-23 15:07:09.714796672 +0200
-@@ -88,6 +88,7 @@
-         double Omega0_idr
-         double T_idr
-         double Omega0_cdm
-+        double lambda_G
-         double Omega0_idm
-         double Omega0_dcdm
-         double Omega0_ncdm_tot
-@@ -450,7 +451,7 @@
-     int background_init(void*,void*)
-     int thermodynamics_init(void*,void*,void*)
-     int perturbations_init(void*,void*,void*,void*)
--    int primordial_init(void*,void*,void*)
-+    int primordial_init(void*,void*,void*,void*)
-     int fourier_init(void*,void*,void*,void*,void*,void*)
-     int transfer_init(void*,void*,void*,void*,void*,void*)
-     int harmonic_init(void*,void*,void*,void*,void*,void*,void*)

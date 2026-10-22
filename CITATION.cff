@@ -5,6 +5,8 @@ message: >-
   Lamine et al. (2025), A&A 697, A109, and the paper listed for the model you
   used.
 type: software
+version: "1.0.1"
+date-released: "2026-10-22"
 authors:
   - family-names: Kou
     given-names: Raphael

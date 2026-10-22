@@ -1,13 +1,13 @@
 # md5 of output/<tag>_cl_lensed.dat for the reference runs.
 # Checksums are of file contents, so they do not depend on 'root'.
 # See README.md in this directory before concluding anything from a mismatch.
-64124b0eb25a1996d4c6d545f92bc49f  output/lambda_G_0.25_cl_lensed.dat
-fca079b6a8f7ecf69f1169172dd28f8c  output/lambda_G_0.50_cl_lensed.dat
-bad48f4b805f1ad10992e995eeadf086  output/lambda_G_0.75_cl_lensed.dat
-8606ff3aed25319ab47d7e55f0f3a7da  output/lambda_G_0.90_cl_lensed.dat
+25ac74ddb0fd3ff07927fbbec31b2c0f  output/lambda_G_0.25_cl_lensed.dat
+af28219161097227e909c324d67f6208  output/lambda_G_0.50_cl_lensed.dat
+5799444502070adce198bdb7a5947fa0  output/lambda_G_0.75_cl_lensed.dat
+a97629ff3cc528e444cd5eaea6c5cdfc  output/lambda_G_0.90_cl_lensed.dat
 64ebf42b78f6054639947f0d10e2c70e  output/lambda_G_1.00_cl_lensed.dat
-09135fcf84c361d4605bd1195989b910  output/lambda_G_1.10_cl_lensed.dat
-cfb384faab475eb30e3a88002338988f  output/lambda_G_1.25_cl_lensed.dat
-39b2ece0ae78ed78513fd93d34ad8711  output/lambda_G_1.50_cl_lensed.dat
-b1abbec861a4d51201307e4adbf73abc  output/lambda_G_1.75_cl_lensed.dat
-bafbf94378a4572119018f8c63f52258  output/lambda_G_2.00_cl_lensed.dat
+b3f6f18bf2649198f86aa629c890e573  output/lambda_G_1.10_cl_lensed.dat
+47f18021e46462ad728d6c7e78f3765e  output/lambda_G_1.25_cl_lensed.dat
+827fef38bdd3eaf4be99e9354b188f97  output/lambda_G_1.50_cl_lensed.dat
+b62f8bad657e952f9ec545106b2b03b2  output/lambda_G_1.75_cl_lensed.dat
+ec79024716db4a06e02271f98162d783  output/lambda_G_2.00_cl_lensed.dat

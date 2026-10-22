@@ -9,7 +9,7 @@ against a pinned upstream release, our own input files and tables, and a
 
 | Model | Upstream CLASS | What is modified | Paper | DOI |
 |---|---|---|---|---|
-| [`1GNT-alpha-BBN`](1GNT-alpha-BBN/) | v3.2.0 | Newton constant rescaled by `lambda_G**2`, with `YHe = BBN` reading a `(omega_b, lambda_G)` table from a modified PArthENoPE | Lamine et al., submitted to A&A | 10.5281/zenodo.xxxxxxx |
+| [`1GNT-alpha-BBN`](1GNT-alpha-BBN/) | v3.2.0 | Newton constant rescaled by `lambda_G**2`, with `YHe = BBN` reading a `(omega_b, lambda_G)` table from a modified PArthENoPE | Lamine et al., submitted to PRD | 10.5281/zenodo.23399409 |
 | `2Gfix` | | | | |
 
 ## Quick start
@@ -22,7 +22,7 @@ cd class_build && mkdir -p output
 md5sum output/lambda_G_1.00_cl_lensed.dat
 ```
 
-The last command should print `64ebf42b78f6054639947f0d10e2c70e`. The eight
+The last command should print `64ebf42b78f6054639947f0d10e2c70e`. The ten
 reference models and their checksums are in `1GNT-alpha-BBN/ini/`, see
 `ini/README.md` there.
 
@@ -62,5 +62,6 @@ developers and is not redistributed here. Please get in touch if you need it.
 
 ## Data
 
-The CLASS outputs behind the published figures are archived separately as a
-dataset, DOI 10.5281/zenodo.yyyyyyy.
+The outputs of the reference runs can be regenerated from the input files of
+each model directory, and checked against the checksums provided there (see
+`1GNT-alpha-BBN/ini/README.md`).
